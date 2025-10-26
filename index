@@ -1,0 +1,870 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Webáruház Működtetése: A Logisztikai Információs Rendszer</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    
+    <style>
+        /* --- Alapstílusok és "Színes-Szagos" Dizájn --- */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            line-height: 1.7;
+            background-color: #f8f9fa;
+            color: #343a40;
+            margin: 0;
+            padding: 0;
+        }
+
+        /* --- Haladáskövető --- */
+        #progress-bar-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 8px;
+            background-color: #e9ecef;
+            z-index: 1000;
+        }
+        #progress-bar {
+            height: 100%;
+            width: 0%;
+            background-color: #007bff;
+            transition: width 0.1s ease-out;
+        }
+
+        /* --- Fő Layout: Oldalsáv + Tartalom --- */
+        .container {
+            display: flex;
+            margin-top: 8px; /* A progress bar miatt */
+        }
+        .sidebar {
+            width: 430px;
+            position: sticky;
+            top: 8px;
+            height: calc(100vh - 8px);
+            background: #343a40;
+            color: #f8f9fa;
+            padding: 25px;
+            overflow-y: auto;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+        }
+        .sidebar h2 {
+            margin-top: 0;
+            color: #ffffff;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 10px;
+        }
+
+        .sidebar nav ul {
+            list-style: none;
+            padding: 0; /* FŐMENÜ BEHÚZÁS NULLÁZÁSA */
+        }
+
+        .sidebar nav li {
+            margin: 15px 0;
+        }
+       .sidebar nav a {
+           text-decoration: none;
+           color: #ced4da;
+           font-weight: 500;
+           font-size: 1.1em;
+           transition: all 0.2s;
+           overflow-wrap: break-word; /* Sortörés a menüben */
+       }
+        .sidebar nav a:hover {
+            color: #ffffff;
+            padding-left: 5px;
+        }
+
+        .sidebar .sub-menu {
+            list-style: square;
+            padding-left: 5px; /* ALMENÜ BEHÚZÁS CSÖKKENTVE */
+            margin-top: 10px;
+        }
+
+        .sidebar .sub-menu li {
+            margin: 8px 0;
+        }
+        .sidebar .sub-menu a {
+            font-size: 0.95em;
+            color: #adb5bd;
+        }
+        
+        .content {
+            flex-grow: 1;
+            padding: 40px 50px;
+        }
+        .content section {
+            margin-bottom: 60px;
+            padding-top: 20px; /* Navigációs "ugrás" helye */
+        }
+
+        /* --- Tartalmi Elemek Stílusa --- */
+        h1, h2, h3 {
+            color: #212529;
+            font-weight: 600;
+            border-bottom: 2px solid #dee2e6;
+            padding-bottom: 10px;
+        }
+        h1 {
+            font-size: 2.8em;
+            border-bottom: 4px solid #007bff;
+        }
+        h2 {
+            font-size: 2.2em;
+            color: #007bff;
+            border-bottom-color: #007bff;
+        }
+        h3 {
+            font-size: 1.6em;
+            border-bottom: none;
+        }
+        
+        img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            margin: 15px 0;
+        }
+
+        .highlight-box {
+            background: #fff3cd;
+            border-left: 5px solid #ffc107;
+            padding: 20px;
+            margin: 25px 0;
+            border-radius: 5px;
+        }
+        .highlight-box h3 {
+            margin-top: 0;
+            color: #856404;
+        }
+
+        /* --- I. TANANYAG: Interaktív Rendszertérkép --- */
+        .system-map {
+            display: flex;
+            flex-wrap: wrap; /* Mobilon egymás alá kerül */
+            justify-content: space-around;
+            align-items: center;
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+        .map-component {
+            position: relative;
+            background: #ffffff;
+            border: 2px solid #007bff;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 10px;
+            width: 200px;
+            text-align: center;
+            cursor: help;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+        }
+        .map-component:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 16px rgba(0,123,255,0.2);
+            border-color: #0056b3;
+        }
+        .map-component i {
+            font-size: 3em;
+            color: #007bff;
+        }
+        .map-component h4 {
+            font-size: 1.3em;
+            margin: 10px 0 0 0;
+            color: #343a40;
+        }
+        .map-arrow {
+            font-size: 3em;
+            color: #adb5bd;
+            margin: 10px;
+        }
+        
+        /* Interaktív Info Buborék (Tooltip) */
+        .tooltip {
+            visibility: hidden;
+            width: 250px;
+            background-color: #343a40;
+            color: #fff;
+            text-align: left;
+            border-radius: 6px;
+            padding: 10px;
+            position: absolute;
+            z-index: 1;
+            bottom: 125%; /* A komponens fölött */
+            left: 50%;
+            margin-left: -125px; /* Középre igazítás */
+            opacity: 0;
+            transition: opacity 0.3s;
+            font-size: 0.9em;
+            line-height: 1.5;
+        }
+        .tooltip::after { /* Kis nyíl a tooltip alján */
+            content: "";
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            margin-left: -5px;
+            border-width: 5px;
+            border-style: solid;
+            border-color: #343a40 transparent transparent transparent;
+        }
+        .map-component:hover .tooltip {
+            visibility: visible;
+            opacity: 1;
+        }
+
+        /* --- I. TANANYAG: Fogalomtár --- */
+        .glossary dl {
+            margin-top: 20px;
+        }
+        .glossary dt {
+            font-weight: 700;
+            font-size: 1.2em;
+            color: #007bff;
+        }
+        .glossary dd {
+            margin-left: 20px;
+            margin-bottom: 15px;
+            border-left: 3px solid #e9ecef;
+            padding-left: 15px;
+        }
+
+        /* --- I. TANANYAG: Vita és Párosítós Játék --- */
+        .debate-game {
+            display: flex;
+            justify-content: space-between;
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+        .drop-zone {
+            width: 48%;
+            min-height: 200px;
+            background: #ffffff;
+            border: 2px dashed #adb5bd;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 10px;
+        }
+        .drop-zone h4 {
+            margin-top: 0;
+            text-align: center;
+        }
+        #pro-zone {
+            border-color: #28a745;
+        }
+        #con-zone {
+            border-color: #dc3545;
+        }
+        .drag-items {
+            width: 100%;
+            text-align: center;
+            padding-top: 15px;
+        }
+        .drag-item {
+            display: inline-block;
+            background-color: #007bff;
+            color: white;
+            padding: 10px 15px;
+            margin: 5px;
+            border-radius: 5px;
+            cursor: grab;
+            transition: background-color 0.2s;
+            position: relative; /* Tooltip pozicionálásához kell */
+        }
+        .drag-item:hover {
+            background-color: #0056b3;
+        }
+        .drag-item.dragging { /* Amikor épp húzzuk */
+            opacity: 0.5;
+        }
+        /* Visszajelzés a zónákon */
+        .drag-over {
+            background-color: #e0f7fa;
+        }
+
+        /* --- Visszajelzés a párosítós játékon (ÚJ) --- */
+        .drag-item.correct-item {
+            background-color: #28a745 !important; /* Zöld */
+            border: 2px solid #218838 !important;
+            color: white !important;
+        }
+        .drag-item.wrong-item {
+            background-color: #dc3545 !important; /* Piros */
+            border: 2px solid #c82333 !important;
+            color: white !important;
+        }
+
+        /* --- Ellenőrző gombok stílusa (ÚJ) --- */
+        .check-button-container {
+            width: 100%;
+            text-align: center;
+            margin-top: 20px;
+        }
+        #check-answers-btn, #reset-game-btn {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            font-size: 1.1em;
+            font-weight: 600;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            margin: 0 10px;
+        }
+        #check-answers-btn:hover {
+            background-color: #0056b3;
+        }
+        #reset-game-btn {
+            background-color: #6c757d; /* Szürke */
+        }
+        #reset-game-btn:hover {
+            background-color: #5a6268;
+        }
+
+        /* === JÁTÉK BŐVÍTÉS (CSS): Indoklás Tooltip Stílusa === */
+        
+        /* A tooltip szövegdoboza (rejtett alapból) */
+        .drag-item.show-explanation::after {
+            content: attr(data-explanation); /* A HTML data-explanation attribútum tartalmát írja bele */
+            visibility: visible;
+            opacity: 1;
+            background-color: #343a40; /* Sötét háttér */
+            color: #fff; /* Világos szöveg */
+            text-align: left;
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 0.9em;
+            line-height: 1.5;
+            
+            /* Pozicionálás az elem fölé */
+            position: absolute;
+            z-index: 10;
+            bottom: 110%; /* Kicsit az elem fölé */
+            left: 50%;
+            transform: translateX(-50%); /* Vízszintes középre igazítás */
+            
+            /* Méret és sortörés */
+            width: 300px; /* Fix szélesség, hogy ne legyen túl széles */
+            white-space: normal; /* Engedje a sortörést */
+        }
+
+        /* A kis nyíl a tooltip alatt */
+        .drag-item.show-explanation::before {
+            content: "";
+            visibility: visible;
+            opacity: 1;
+            position: absolute;
+            z-index: 11;
+            bottom: 110%;
+            margin-bottom: -5px; /* A doboz aljára illeszti */
+            left: 50%;
+            transform: translateX(-50%);
+            border-width: 5px;
+            border-style: solid;
+            border-color: #343a40 transparent transparent transparent;
+        }
+        
+        /* Rejtett állapot (::before és ::after) */
+        .drag-item::before, .drag-item::after {
+            visibility: hidden;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        /* === JÁTÉK BŐVÍTÉS VÉGE (CSS) === */
+        
+
+        /* --- II. FELDOLGOZÁSI TERV: Táblázat --- */
+        .lesson-plan-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .lesson-plan-table th, .lesson-plan-table td {
+            border: 1px solid #dee2e6;
+            padding: 12px 15px;
+            text-align: left;
+            vertical-align: top;
+        }
+        .lesson-plan-table th {
+            background-color: #e9ecef;
+            color: #495057;
+            font-weight: 600;
+        }
+        .lesson-plan-table tbody tr:nth-child(odd) {
+            background-color: #f8f9fa;
+        }
+        .lesson-plan-table td:first-child {
+            width: 15%;
+            font-weight: 700;
+            color: #007bff;
+        }
+
+        /* --- Reszponzivitás (Mobilon) --- */
+        @media (max-width: 900px) {
+            .container {
+                flex-direction: column;
+            }
+            .sidebar {
+                width: 100%;
+                height: auto;
+                position: static;
+                box-sizing: border-box; /* Padding beleszámít */
+            }
+            .content {
+                padding: 20px;
+            }
+            .system-map, .debate-game {
+                flex-direction: column;
+            }
+            .map-component, .drop-zone {
+                width: 90%;
+                margin: 10px 0;
+            }
+            .map-arrow {
+                transform: rotate(90deg);
+            }
+        }
+
+    </style>
+</head>
+<body>
+
+    <div id="progress-bar-container">
+        <div id="progress-bar"></div>
+    </div>
+
+    <div class="container">
+        <nav class="sidebar">
+            <h2>📘 Ebook Menü</h2>
+            <ul>
+                <li><a href="#tananyag">I. TANANYAG</a>
+                    <ul class="sub-menu">
+                        <li><a href="#black-friday">Indítás</a></li>
+                        <li><a href="#terkep">Interaktív Térkép</a></li>
+                        <li><a href="#fogalmak">Fogalomtár</a></li>
+                        <li><a href="#vita">Stratégiai Vita</a></li>
+                        <li><a href="#jatek">Interaktív Feladat</a></li>
+                    </ul>
+                </li>
+                <li><a href="#terv">II. FELDOLGOZÁSI TERV</a>
+                    <ul class="sub-menu">
+                        <li><a href="#celok">Tanulási Célok</a></li>
+                        <li><a href="#oramenet">Óraforgatókönyv</a></li>
+                        <li><a href="#ertekeles">Értékelés</a></li>
+                    </ul>
+                </li>
+                <li><a href="#modszertan">III. MÓDSZERTAN</a>
+                    <ul class="sub-menu">
+                        <li><a href="#andragogia">Andragógia</a></li>
+                        <li><a href="#konstruktivizmus">Konstruktivizmus</a></li>
+                    </ul>
+                </li>
+            </ul>
+        </nav>
+
+        <main class="content">
+
+            <section id="tananyag">
+                <h1>I. TANANYAG</h1>
+                <h2>A Logisztikai Információs Rendszer</h2>
+
+                <p>Üdvözlünk a <strong>Webáruház működtetése</strong> tantárgy <strong>Logisztikai feladatok</strong> témakörében!</p>
+                <p>Ebben a modulban a <strong>Logisztikai információs rendszerekkel</strong> ismerkedünk,</p>
+                <p>a "gépházba" nézünk be: megvizsgáljuk azt a digitális gerincet, ami nélkül egy modern webshop csupán egy üres kirakat lenne.</p>
+
+                <img src="korforgas.png" alt="A logisztikai folyamat ábrája">
+                
+                <div class="highlight-box" id="black-friday">
+                    <h3>A "Black Friday Káosz"</h3>
+                    <p>Képzeld el a helyzetet: Black Friday, délelőtt 10:00. A vevő megveszi a hőn áhított terméket. A webshop <strong>100 db</strong>-ot mutatott készleten. A valóságban a raktárban <strong>0 db</strong> van. A vevő 2 napos szállítást látott, de a rendszer már most 3 napos csúszásban van, és erről senki nem tud.</p>
+                    <p><strong>A kérdés:</strong> Hogyan akadályozza meg egy jól felépített Logisztikai Információs Rendszer (LIS) ezt a katasztrófát?</p>
+                </div>
+
+                <img src="valaszto.png" alt="Elválasztó">
+                
+                <h3 id="terkep">A Rendelés Útja </h3>
+                <p>Egy rendelés adatai több, egymással tökéletes szinkronban lévő rendszeren utaznak keresztül. Vidd az egeret a dobozok fölé a buborékokért!</p>
+                
+                <div class="system-map">
+                    <div class="map-component">
+                        <i class="fa-solid fa-cart-shopping"></i>
+                        <h4>1. WEBÁRUHÁZ</h4>
+                        <span class="tooltip"><strong>(pl. Shopify, Magento)</strong><br>A "kirakat", ahol a vevő leadja a rendelést. Ez a folyamat indítója (trigger). Azonnal továbbítania kell a rendelés adatait az ERP felé.</span>
+                    </div>
+                    
+                    <div class="map-arrow"><i class="fa-solid fa-arrow-right"></i></div>
+                    
+                    <div class="map-component">
+                        <i class="fa-solid fa-server"></i>
+                        <h4>2. ERP</h4>
+                        <span class="tooltip"><strong>Vállalatirányítási Rendszer</strong><br>A vállalat "agya". Fogadja a rendelést, ellenőrzi a központi készletet, lefoglalja a terméket, és generálja a számlát. Ez az "egyetlen igazság forrása" (Single Source of Truth).</span>
+                    </div>
+
+                    <div class="map-arrow"><i class="fa-solid fa-arrow-right"></i></div>
+
+                    <div class="map-component">
+                        <i class="fa-solid fa-warehouse"></i>
+                        <h4>3. WMS</h4>
+                        <span class="tooltip"><strong>Raktárirányítási Rendszer</strong><br>A fizikai raktár digitális irányítója. Megkapja az ERP-től a "szedési listát", optimalizálja a raktáros útvonalát, kezeli a csomagolást és a tárhelyeket.</span>
+                    </div>
+
+                    <div class="map-arrow"><i class="fa-solid fa-arrow-right"></i></div>
+
+                    <div class="map-component">
+                        <i class="fa-solid fa-truck-fast"></i>
+                        <h4>4. TMS</h4>
+                        <span class="tooltip"><strong>Szállítmányozási Rendszer</strong><br>A "last mile" menedzsere. Megkapja a kész csomag adatait, kommunikál a futárcégekkel (pl. GLS, DPD), és kinyomtatja a szállítási címkét.</span>
+                    </div>
+                </div>
+
+                <img src="valaszto.png" alt="Elválasztó">
+
+                
+                <h3 id="fogalmak">Fogalomtár</h3>
+                <p>A térképen látott rendszerek és folyamatok kulcsfogalmai:</p>
+                <div class="glossary">
+                    <dl>
+                        <dt>Automatizáció</dt>
+                        <dd>A manuális munka (pl. adatok másolása, e-mailek írása, címkenyomtatás) kiváltása a rendszerek közötti automatikus adatátvitellel. Ez csökkenti a hibát és növeli a sebességet.</dd>
+
+                        <dt>CRM (Customer Relationship Management)</dt>
+                        <dd>Ügyfélkapcsolat-kezelő rendszer. Ez a szoftver tárolja a vevők adatait, vásárlási előzményeit, kommunikációját. Gyakran az ERP vagy a webáruház motor része. A logisztika számára azért fontos, mert ez adja a pontos szállítási címet és elérhetőségeket.</dd>
+
+                        <dt>Dokumentumkezelés</dt>
+                        <dd>A logisztikai folyamatot kísérő hivatalos dokumentumok digitális létrehozása és áramlása. Ide tartozik a <b>Számla</b> (az ERP generálja), a <b>Szállítólevél</b> (a csomagba kerül, az ERP vagy WMS generálja), valamint a <b>Raktári bevét</b> és <b>Kiadás</b> bizonylatai (a WMS kezeli).</dd>
+
+                        <dt>Integráció</dt>
+                        <dd>A LIS kulcsfogalma. A különböző szoftverkomponensek (Webáruház, ERP, WMS, TMS) összekapcsolása, hogy az adatok automatikusan, emberi beavatkozás nélkül áramolhassanak közöttük. Leggyakrabban API-kon (Application Programming Interface) keresztül valósul meg.</dd>
+                        
+                        <dt>Logisztika</dt>
+                        <dd>Az e-kereskedelemben a logisztika jelenti a teljes fizikai folyamatot a termék beszerzésétől a vevőnek történő kézbesítésig. Magában foglalja a raktározást, a komissiózást (picking), a csomagolást (packing) és a szállítmányozást. A LIS ennek a fizikai folyamatnak a digitális irányítója.</dd>
+
+                        <dt>Raktározás</dt>
+                        <dd>A logisztika fizikai része; a termékek átvétele, tárolása a raktárban, majd összekészítése (komissiózás) és csomagolása a kiszállításhoz. A modern raktározást szoftveres (WMS) és hardveres (pl. vonalkódolvasók, PDA-k) eszközök támogatják a hatékonyság érdekében.</dd>
+
+                        <dt>Rendszer</dt>
+                        <dd>Összefoglaló név az egymással összekapcsolt szoftveres és hardveres elemek összességére. A LIS (Logisztikai Információs Rendszer) maga is egy rendszer, ami kisebb alrendszerekből (ERP, WMS, TMS) áll, melyek egy közös célért (a rendelés teljesítése) működnek együtt.</dd>
+                        
+                        <dt>Státuszkövetés</dt>
+                        <dd>A sikeres integráció leglátványosabb eredménye. Azt jelenti, hogy a belső logisztikai állapotokat (pl. "Feldolgozás alatt", "Összekészítés alatt", "Szállítás alatt") valós időben, automatikusan kommunikáljuk a vevő felé.</dd>
+
+                        <dt>Szállítmányozás</Ddt>
+                        <dd>A logisztikai lánc utolsó, de egyik legkritikusabb lépése: a csomag eljuttatása a raktárból a vevőhöz ("last mile delivery"). Ezt jellemzően külső futárszolgálatok végzik. A TMS szoftver feladata ezen partnerek digitális kezelése.</dd>
+
+                        <dt>TMS (Transportation Management System)</dt>
+                        <dd>Szállítmányozás-irányítási Rendszer. A "last mile" (utolsó kilométer) menedzsere. Ez a szoftver áll kapcsolatban (integrációban) a futárszolgálatok (pl. GLS, DPD, Packeta) rendszereivel. Automatikusan generálja a szállítási címkéket (fuvarleveleket) és kezeli a csomagkövetést.</dd>
+                        
+                        <dt>Vállalatirányítási Rendszer (ERP)</dt>
+                        <dd>Egy integrált szoftverrendszer, amely egy vállalat összes fő üzleti folyamatát kezeli (pénzügy, HR, beszerzés, készlet). A LIS esetében ez a központi adatbázis, az "agy", ami megmondja, miből mennyi van, és kezeli a számlázást. Ez biztosítja az "egyetlen igazság forrását" (Single Source of Truth).</dd>
+
+                        <dt>Vevő</dt>
+                        <dd>A logisztikai folyamat alfája és omegája. Ő indítja el a folyamatot a rendelésével, és ő a végső címzettje a fizikai terméknek és a státuszfrissítéseknek is. A teljes rendszer az ő elégedettségének biztosítására épül.</dd>
+
+                        <dt>Webáruház (Motor)</dt>
+                        <dd>A "kirakat", a felhasználói felület, ahol a vevő leadja a rendelést. A logisztikai folyamat szempontjából ez a legelső láncszem, az esemény indítója (trigger). Feladata a rendelési adatok és a vevői adatok rögzítése és azonnali továbbítása az ERP rendszer felé.</dd>
+                        
+                        <dt>WMS (Warehouse Management System)</dt>
+                        <dd>Raktárirányítási Rendszer. A fizikai raktár digitális mása és irányítója. Pontosan tudja, melyik termék melyik polcon (tárhelyen) van. Optimalizálja a raktárosok "szedési" (komissiózási) útvonalát, és kezeli a raktári bevételezést és kiadást.</dd>
+
+                    </dl>
+                </div>
+
+                
+
+                <img src="valaszto.png" alt="Elválasztó">
+
+                
+                <h3 id="vita">Stratégiai Vita: Beruházzunk vagy ne?</h3>
+                <p>Egy napi 100 rendeléses KKV webáruház vagyunk, ami kinőtte az Excelt. A vezetőség előtt két út áll:</p>
+                <ol>
+                    <li>Vegyünk egy <strong>drága, integrált ERP/WMS rendszert</strong> (50.000 EUR beruházás).</li>
+                    <li>Oldjuk meg "okosba": használjunk több olcsó, különálló szoftvert (pl. egy számlázó, egy készletkezelő, egy futárintegrátor) és <strong>foltozgassuk össze ("patchwork")</strong>.</li>
+                </ol>
+                <p>Nincs egyetlen jó megoldás. Mindkettő mellett és ellen is szólnak stratégiai érvek. A következő feladatban ezeket kell a helyükre tenned!</p>
+
+                <h3 id="jatek">Interaktív Feladat: Érvek Párosítása</h3>
+                <p>Húzd az alábbi érveket a megfelelő dobozba! Dönts el, melyik érv szól a drága, integrált rendszer **Mellett (Pro)**, és melyik **Ellene (Con)**.</p>
+                
+                <div class="debate-game">
+                    <div id="pro-zone" class="drop-zone" data-target="pro">
+                        <h4>MELLETTE (Pro)</h4>
+                        <p style="text-align: center; color: #6c757d;">(Húzz ide érveket!)</p>
+                    </div>
+                    <div id="con-zone" class="drop-zone" data-target="con">
+                        <h4>ELLENE (Con)</h4>
+                        <p style="text-align: center; color: #6c757d;">(Húzz ide érveket!)</p>
+                    </div>
+                    
+                    <div class="drag-items">
+                        <div class="drag-item" draggable="true" data-target="pro" data-explanation="Egy integrált rendszer bírja a terhelést, ha a webshop a napi 100 rendelésről 1000-re nő. A 'foltozgatott' megoldások ilyenkor összeomlanak.">Jövőbiztos skálázhatóság</div>
+                        <div class="drag-item" draggable="true" data-target="con" data-explanation="Ezek a rendszerek (pl. SAP, Oracle) és a bevezetésüket végző tanácsadók rendkívül drágák, ami egy KKV számára komoly likviditási terhet jelent.">Magas kezdeti beruházási költség</div>
+                        <div class="drag-item" draggable="true" data-target="pro" data-explanation="Ahol emberi kéz ír át adatot (pl. címet, árat), ott hiba lesz. Az integráció ezt kiváltja, csökkentve a téves szállítások és számlák számát.">Manuális hibaráták csökkentése</div>
+                        <div class="drag-item" draggable="true" data-target="con" data-explanation="Az integrált rendszerek bevezetése gyakran a vállalat alap működését és folyamatait szabja át. Az igényfelmérés, tesztelés és az oktatás hónapokig is eltarhat.">Hosszú bevezetési idő</div>
+                        <div class="drag-item" draggable="true" data-target="pro" data-explanation="A rendszer 'rákényszeríti' a céget a legjobb gyakorlatok (best practice) használatára. Mindenki ugyanúgy dolgozik, a folyamatok követhetővé válnak.">Standardizált, átlátható folyamatok</div>
+                        <div class="drag-item" draggable="true" data-target="con" data-explanation="A 'dobozos' rendszerek nehezen kezelik a cég egyedi, speciális kéréseit. Egy 'foltozgatott' rendszer sokkal rugalmasabban alakítható.">Rugalmatlanság, nehézkes egyedi igények kezelése</div>
+                        <div class="drag-item" draggable="true" data-target="pro" data-explanation="Az ERP az 'egyetlen igazság forrása'. Ha a raktárban kivesznek egy terméket, az azonnal látszik a webshopban, elkerülve a 'fantomkészlet' értékesítését.">Valós idejű készletkezelés</div>
+                        <div class="drag-item" draggable="true" data-target="con" data-explanation="Egy ERP vagy WMS használata nem magától értetődő. A dolgozókat (raktáros, pénzügyes) alaposan ki kell képezni, ami idő és energia.">Komplex betanulási folyamat</div>
+                        <div class="drag-item" draggable="true" data-target="pro" data-explanation="A rendszer automatikusan generálja a bizonylatokat (számla, szállítólevél) a megfelelő adatokkal, emberi beavatkozás nélkül.">Automatikus számlázás és szállítólevél</div>
+                        <div class="drag-item" draggable="true" data-target="con" data-explanation="A beruházás után is fizetni kell az éves szoftverkövetési díjakat, frissítéseket és a támogatást, ami folyamatos költséget jelent.">Magas fenntartási és licencdíjak</div>
+                        <div class="drag-item" draggable="true" data-target="pro" data-explanation="Csak egy integrált rendszer tud valós idejű, pontos státuszfrissítést küldeni a vevőnek (pl. 'Csomagod összekészítve', 'Futárnak átadva').">Professzionális vevői élmény (státuszkövetés)</div>
+                        <div class="drag-item" draggable="true" data-target="con" data-explanation="Ha csak egy apró dolgot kell módosítani (pl. egy új futár), egy 'patchwork' rendszerben ez gyorsabb lehet, mint egy nagyvállalati rendszerben.">Gyorsabb, rugalmas (patchwork) módosítások</div>
+                        <div class="drag-item" draggable="true" data-target="pro" data-explanation="Az integrált rendszerben minden adat egy helyen van. Ez lehetővé teszi komplex riportok (pl. 'melyik termék a legprofitábilisabb?') lekérését a vezetőség számára.">Adatvezérelt döntéshozatal (riportok)</div>
+                        <div class="drag-item" draggable="true" data-target="pro" data-explanation="A webshopból érkező bevétel és a számlák adatai automatikusan átkerülnek a könyvelési (pénzügyi) modulba, kiváltva a manuális adatrögzítést.">Kevesebb manuális könyvelési feladat</div>
+                    </div>
+
+
+                    <div class="check-button-container">
+                        <button id="check-answers-btn">Ellenőrzés</button>
+                        <button id="reset-game-btn">Újrapróbálom</button>
+                    </div>
+
+                </div>
+
+            </section>
+
+            <section id="terv">
+                <h2>II. FELDOLGOZÁSI TERV (45 perc)</h2>
+
+                <p>Ez a tananyag egy 45 perces tanórára lett tervezve, ahol a fókusz a kritikai gondolkodáson és a stratégiai döntéshozatalon van.</p>
+
+                <h3 id="celok">Tanulási Célok (Bloom-taxonómia alapján)</h3>
+                <ul>
+                    <li><strong>Ismeret:</strong> A tanuló definiálja a LIS fő komponenseit (ERP, WMS, TMS).</li>
+
+                    <li><strong>Megértés:</strong> A tanuló elmagyarázza az adatáramlás útját egy rendelés során.</li>
+
+                    <li><strong>Alkalmazás:</strong> A tanuló a "státuszkövetés" és "automatizáció" fogalmait egy valós példán keresztül bemutatja.</li>
+
+                    <li><strong>Analízis:</strong> A tanuló összehasonlítja az integrált és a "patchwork" rendszerek előnyeit és hátrányait.</li>
+
+                    <li><strong>Értékelés:</strong> A tanuló képes érvelni egy adott LIS-beruházás mellett vagy ellen egy KKV-szcenárióban.</li>
+                </ul>
+
+
+                <img src="valaszto.png" alt="Elválasztó">
+
+                
+                <h3 id="oramenet">Óraterv</h3>
+                <table class="lesson-plan-table">
+                    <thead>
+                        <tr>
+                            <th>Idő</th>
+                            <th>Tanári Tevékenység (Irányítás)</th>
+                            <th>Tanulói Tevékenység (Módszer)</th>
+                            <th>Digitális Eszközök</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>0-5 p.</td>
+                            <td><strong>Ráhangolódás:</strong> A "Black Friday Káosz" dilemma felvázolása, problémafelvetés.</td>
+                            <td><strong>Brainstorming:</strong> Aktív részvétel, hibaforrások azonosítása (Probléma-alapú indítás).</td>
+                            <td>Projektor (a szcenárió kivetítése)</td>
+                        </tr>
+                        <tr>
+                            <td>5-20 p.</td>
+                            <td><strong>Irányított felfedezés:</strong> Az interaktív térkép elemeinek felrajzolása (tábla/whiteboard). Kérdésekkel vezeti a tanulókat az adat útján.</td>
+                            <td><strong>Konstruktivizmus:</strong> A tanulók közösen építik fel a folyamatábrát, válaszolnak a kérdésekre (pl. "Ki tud a készletről?") (Vizuális modellezés).</td>
+                            <td>Ez a weboldal (interaktív térkép) vagy whiteboard.</td>
+                        </tr>
+                        <tr>
+                            <td>20-25 p.</td>
+                            <td><strong>Mikro-előadás:</strong> A kulcsfogalmak (ERP, státuszkövetés, automatizáció) rögzítése a közösen felépített ábrán.</td>
+                            <td><strong>Jegyzetelés, értelmezés:</strong> A fogalmak elhelyezése a kontextusban.</td>
+                            <td>Ez a weboldal (fogalomtár).</td>
+                        </tr>
+                        <tr>
+                            <td>25-40 p.</td>
+                            <td><strong>Vita Moderálása:</strong> A "Beruházzunk vagy ne?" dilemma felvetése. Két csoport kijelölése (Pro vs. Con).</td>
+                            <td><strong>Stratégiai Vita:</strong> A tanulók érveket gyűjtenek és ütköztetnek (Elemzés, Értékelés).</td>
+                            <td>Ez a weboldal (Vita fejezet).</td>
+                        </tr>
+                        <tr>
+                            <td>40-45 p.</td>
+                            <td><strong>Szintézis és Lezárás:</strong> A vita tanulságainak összegzése. Visszacsatolás a "Black Friday Káoszra" (megoldás felvázolása).</td>
+                            <td><strong>Reflexió:</strong> A tanultak összekapcsolása a kiinduló problémával.</td>
+                            <td>-</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+
+                <img src="valaszto.png" alt="Elválasztó">
+
+                
+                <h3 id="ertekeles">Értékelés és Visszacsatolás</h3>
+                <ul>
+                    <li><strong>Formális (diagnosztikus):</strong> A "Black Friday Káosz" vitában való részvétel mutatja meg az előzetes tudást.</li>
+
+                    <li><strong>Formatív (fejlesztő):</strong> A stratégiai vita során elhangzott érvek minősége (formatív értékelés).</li>
+
+                    <li><strong>Digitális (önellenőrző):</strong> Az "Érvek Párosítása" interaktív feladat azonnali visszajelzést ad a tanulóknak a megértésről (lásd fentebb).</li>
+                </ul>
+            </section>
+            
+            <section id="modszertan">
+                <h2>III. MÓDSZERTAN</h2>
+                <h3>Módszertani Választások Indoklása (Pedagógiai Reflexió)</h3>
+                
+                <p>Ez az óraterv tudatosan távolodik el a hagyományos, frontális oktatástól. Célom nem a lexikális tudás átadása, hanem a <strong>rendszerszemlélet (systems thinking)</strong> és a <strong>kritikai döntéshozatali képesség</strong> fejlesztése.</p>
+
+                <h4 id="pedagogia">Pedagógiai Megközelítés </h4>
+                <p>Az óra a probléma-alapú tanulásra (PBL) épül. A "Black Friday Káosz" (ráhangolódás) azonnal relevánssá teszi a témát. A tanuló akkor motivált, ha érti, hogy a tananyag hogyan oldja meg a valós, gyakorlati problémáit. Nem a definícióval kezdünk, hanem a fájdalomponttal.</p>
+                
+                <h4 id="konstruktivizmus">Konstruktivizmus (Irányított Felfedezés)</h4>
+                <p>Az óra gerincét adó "A Rendelés Útja" (interaktív térkép) módszer konstruktivista. Az oktató nem <em>közli</em> az adatfolyamot, hanem a tanulók <em>megépítik</em> azt (a meglévő tudásukra alapozva). Ez a "felfedezés" sokkal mélyebb megértést eredményez, mintha csak egy kész ábrát mutatnánk. A tanulók létrehozzák a tudást, nem passzívan befogadják.</p>
+            </section>
+        </main>
+    </div>
+
+    <script>
+        // --- 1. Haladáskövető Sáv Működése ---
+        window.onscroll = function() {
+            updateProgressBar();
+        };
+
+        function updateProgressBar() {
+            var totalHeight = document.body.scrollHeight - window.innerHeight;
+            var progress = (window.pageYOffset / totalHeight) * 100;
+            document.getElementById("progress-bar").style.width = progress + "%";
+        }
+
+        // --- 2. Párosítós Játék (Drag & Drop) Működése (VÉGLEGES JAVÍTÁS) ---
+        document.addEventListener('DOMContentLoaded', (event) => {
+            const dragItems = document.querySelectorAll('.drag-item');
+            const dropZones = document.querySelectorAll('.drop-zone');
+            const checkBtn = document.getElementById('check-answers-btn');
+            const resetBtn = document.getElementById('reset-game-btn');
+            const itemContainer = document.querySelector('.drag-items'); // A kiinduló tároló
+            
+            let gameChecked = false; // Figyeli, hogy az "Ellenőrzés" meg lett-e nyomva
+
+            // --- 1. Adjunk egyedi ID-t minden elemnek a biztos követéshez
+            dragItems.forEach((item, index) => {
+                if (!item.id) {
+                    item.id = `drag-item-${index}`;
+                }
+            });
+
+            // --- 2. Húzás eseménykezelők ---
+            dragItems.forEach(item => {
+                // Húzás indítása
+                item.addEventListener('dragstart', (e) => {
+                    e.dataTransfer.setData('text/plain', e.target.id); 
+                    e.dataTransfer.effectAllowed = 'move'; // JAVÍTÁS: Engedélyezzük a mozgatást
+                    e.target.classList.remove('show-explanation'); // Tooltip elrejtése húzás közben
+                    setTimeout(() => {
+                        e.target.classList.add('dragging'); 
+                    }, 0);
+                });
+
+                // Húzás vége
+                item.addEventListener('dragend', (e) => {
+                    e.target.classList.remove('dragging');
+                });
+
+                // --- 3. Tooltip eseménykezelők (ÚJ) ---
+                // Egér fölé
+                item.addEventListener('mouseover', (e) => {
+                    // Csak akkor mutassa, ha a játékot már ellenőriztük
+                    if (gameChecked && e.target.dataset.explanation) {
+                        e.target.classList.add('show-explanation');
+                    }
+                });
+
+                // Egér el
+                item.addEventListener('mouseout', (e) => {
+                    e.target.classList.remove('show-explanation');
+                });
+            });
+
+            // --- 4. Dobozok eseménykezelői ---
+            dropZones.forEach(zone => {
+                zone.addEventListener('dragover', (e) => {
+                    e.preventDefault(); // JAVÍTÁS: Enélkül nem működik a drop!
+                    e.dataTransfer.dropEffect = 'move'; // JAVÍTÁS: Vizuális visszajelzés a böngészőnek
+                    zone.classList.add('drag-over');
+                });
+
+                zone.addEventListener('dragleave', (e) => {
+                    e.preventDefault();
+                    zone.classList.remove('drag-over');
+                });
+
+                // --- 5. Dobás esemény (JAVÍTOTT LOGIKA) ---
+                zone.addEventListener('drop', (e) => {
+                    e.preventDefault(); // JAVÍTÁS: Fontos a dobás véglegesítéséhez
+                    zone.classList.remove('drag-over');
+
+                    const draggedId = e.dataTransfer.getData('text/plain');
+                    if (!draggedId) { return; } // Hiba elkerülése
+
+                    const draggedEl = document.getElementById(draggedId);
+
+                    if (draggedEl) {
+                        // BÁRMIT BÁRHOVA beleejtünk. Nincs ellenőrzés.
+                        zone.appendChild(draggedEl);
+                        
+                        // Ha volt rajta szín (mert már ellenőriztük), szedje le
+                        draggedEl.classList.remove('correct-item', 'wrong-item');
+                        // A tooltipet is rejtse el
+                        draggedEl.classList.remove('show-explanation');
+                        // Mozgatás után a játék "ellenőrizetlen" állapotba kerül
+                        gameChecked = false; 
+                    }
+                });
+            });
+
+            // --- 6. Ellenőrzés gomb (JAVÍTOTT LOGIKA) ---
+            checkBtn.addEventListener('click', () => {
+                gameChecked = true; // Mostantól mutathatjuk a tooltipet
+                
+                dropZones.forEach(zone => {
+                    const zoneType = zone.dataset.target; // A doboz típusa ('pro' vagy 'con')
+                    const itemsInZone = zone.querySelectorAll('.drag-item');
+
+                    itemsInZone.forEach(item => {
+                        const itemType = item.dataset.target; // Az elem típusa ('pro' vagy 'con')
+                        
+                        // Helyes helyen van?
+                        if (itemType === zoneType) {
+                            item.classList.add('correct-item');
+                            item.classList.remove('wrong-item');
+                        } else { // Rossz helyen van
+                            item.classList.add('wrong-item');
+                            item.classList.remove('correct-item');
+                        }
+                    });
+                });
+            });
+
+            // --- 7. Újrapróbálom gomb (JAVÍTOTT LOGIKA) ---
+            resetBtn.addEventListener('click', () => {
+                gameChecked = false; // Tooltipek kikapcsolása
+                
+                // Visszarakjuk az összes elemet a kiinduló tárolóba
+                dragItems.forEach(item => {
+                    // Leszedjük a színeket és a tooltipet
+                    item.classList.remove('correct-item', 'wrong-item', 'show-explanation');
+                    // Visszamozgatjuk a ".drag-items" tárolóba
+                    itemContainer.appendChild(item);
+                });
+            });
+        });
+    </script>
+
+</body>
+</html>
